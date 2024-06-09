@@ -1,5 +1,5 @@
 # Feature-Space-Augmentation-and-Iterated-Learning
-Official implementation for (Long Tail Image Generation Through Feature Space Augmentation and Iterated Learning)[https://arxiv.org/abs/2405.01705], accepted in (LXAI CVPR2024)[https://research.latinxinai.org/workshops/cvpr/cvpr.html] as an extended abstract.
+Official implementation for [https://arxiv.org/abs/2405.01705](Long Tail Image Generation Through Feature Space Augmentation and Iterated Learning), accepted in (LXAI CVPR2024)[https://research.latinxinai.org/workshops/cvpr/cvpr.html] as an extended abstract.
 
 ### Usage
 The tested dataset is available (here)[https://physionet.org/content/cxr-lt-iccv-workshop-cvamd/1.0.0/] 
