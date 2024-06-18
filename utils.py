@@ -43,7 +43,7 @@ def Fuse(X1, X2, X1_map, X2_map, encoder, decoder, q1=0.5, q2=0.5):
     frank = (mask_nxor * mask * X1) + (mask_nxor * (~mask) * X2) + X_view1 + X_view2
     frank = decoder(torch.tensor(frank).cuda().float()).cpu()
     return frank
-
+# https://github.com/niteshsukhwani/MLSMOTE/blob/master/mlsmote.py
 def SmoteishFuse(X, tail_indices, y, maps, indices, n_sample, encoder, decoder, classes, pipe = None, b_size=10,
         d_steps=0, verbose=True, q1=None, q2=None):
     n = len(indices)
