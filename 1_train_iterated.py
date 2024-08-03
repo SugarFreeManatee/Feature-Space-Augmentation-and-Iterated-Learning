@@ -21,7 +21,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description="Simple example of a training script.")
     parser.add_argument("--pretrained_model_name_or_path", type=str, help="Path to pretrained model or model identifier from huggingface.co/models.")
     parser.add_argument("--classifier_weights", type=str, help="Path to pretrained classifier state dict.")
-    parser.add_argument("--train_data_dir", type=str, help="A folder containing the training data. Folder contents must follow the structure described in the HuggingFace docs.")
+    parser.add_argument("--train_data_dir", default='', type=str, help="A folder containing the training data. Folder contents must follow the structure described in the HuggingFace docs.")
     parser.add_argument("--labels_csv", type=str, help="Path to csv file containing the labels for each image.")
     parser.add_argument("--output_dir", type=str, default="iterated-model", help="The output directory where the model predictions and checkpoints will be written.")
     parser.add_argument("--seed", type=int, help="A seed for reproducible training.")
@@ -32,9 +32,10 @@ def parse_args():
     parser.add_argument("--learning_rate", type=float, default=1e-4, help="Initial learning rate.")
     parser.add_argument("--learning_rate_cls", type=float, default=1e-4, help="Initial learning rate for the classifier.")
     parser.add_argument("--pkl_file", type=str, help="Path to pkl file containing the labels and features for each image.")
+    parser.add_argument("--npy_dir", type=str, default ='', help="Path to npy files for image features.")
     parser.add_argument("--val_pkl_file", type=str, default='', help="Path to pkl file containing the validation labels and features for each image.")
     parser.add_argument("--dataloader_num_workers", type=int, default=8, help="Number of subprocesses to use for data loading.")
-    parser.add_argument("--checkpointing_steps", type=int, default=500, help="Save a checkpoint of the training state every X updates.")
+    parser.add_argument("--checkpointing_steps", type=int, default=100, help="Save a checkpoint of the training state every X updates.")
     parser.add_argument("--adam_beta1", type=float, default=0.9, help="The beta1 parameter for the Adam optimizer.")
     parser.add_argument("--adam_beta2", type=float, default=0.999, help="The beta2 parameter for the Adam optimizer.")
     parser.add_argument("--adam_weight_decay", type=float, default=1e-2, help="Weight decay to use.")
@@ -55,11 +56,11 @@ def main():
     writer = SummaryWriter(os.path.join(args.output_dir, str(datetime.now()) + args.suffix))
     validation = args.val_pkl_file != ''
     if args.data_type == "latent_vec":
-        data = FeatureDataset(args.pkl_file)
+        data = FeatureDataset(args.pkl_file, args.npy_dir)
         if validation:
             val_data = FeatureDataset(args.val_pkl_file)
     else:
-        data = ImageDataset(args.pkl_file)
+        data = ImageDataset(args.labels_csv, args.train_data_dir)
         if validation:
             val_data = ImageDataset(args.val_pkl_file)
     if "weighted" in args.suffix:
@@ -103,12 +104,12 @@ def main():
         optimizer_cls.load_state_dict(params["optimizer_cls_state_dict"])
         optimizer_dc.load_state_dict(params["optimizer_dc_state_dict"])
 
-    logging.info("Training started")
+    print("Training started")
     max_step_im = 0
     max_step_in = 0
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in tqdm(range(args.epochs), total=args.epochs):
         t = time()
-        logging.info(f"Beginning interaction phase {epoch}...")
+        print(f"Beginning interaction phase {epoch}...")
         
         train_loss_c = 0
         train_loss_ae = 0
@@ -162,7 +163,7 @@ def main():
                     prediction = classifier(X_s)
                     loss_c = loss_fn_c(prediction.float(), y)
                     v_loss_c += loss_c.item()
-                    v_map += multilabel_auprc(input=prediction, target=y, num_labels = 19).item()
+                    v_map += multilabel_auprc(input=prediction, target=y, num_labels = len(data.data.label.iloc[0])).item()
                     loss_ae = loss_fn_ae(X_c, X)
                     v_loss_ae += loss_ae.item()
                     
@@ -171,9 +172,9 @@ def main():
                 writer.add_scalar('Loss_c/val', v_loss_c / (step_t + 1), epoch)
                 writer.add_scalar('mAP/val', v_map / (step_t + 1), epoch)
         
-        logging.info(f'Avg Reconstruction loss: {train_loss_ae / (args.in_epochs * (step_t + 1))}')
-        logging.info(f'Avg Classification loss: {train_loss_c / (args.in_epochs * (step_t + 1))}')
-        logging.info(f"Beginning imitation phase {epoch}...")
+        print(f'Avg Reconstruction loss: {train_loss_ae / (args.in_epochs * (step_t + 1))}')
+        print(f'Avg Classification loss: {train_loss_c / (args.in_epochs * (step_t + 1))}')
+        print(f"Beginning imitation phase {epoch}...")
         if epoch %args.checkpointing_steps == 0:
             PATH = os.path.join(args.output_dir, f"classifier_{args.suffix}_{epoch}.pk")
             torch.save({
@@ -222,9 +223,9 @@ def main():
             if max_step_im == 0:
                 max_step_im = step_t
 
-        logging.info(f'Avg Imitation loss: {train_loss_im / (args.im_epochs * (step_t + 1))}')
+        print(f'Avg Imitation loss: {train_loss_im / (args.im_epochs * (step_t + 1))}')
         eta = (time() - t) * (args.epochs - epoch - 1)
-        logging.info(f"ETA: {str(timedelta(seconds=int(eta)))}")
+        print(f"ETA: {str(timedelta(seconds=int(eta)))}")
     PATH = os.path.join(args.output_dir, f"classifier_{args.suffix}_{epoch}.pk")
     torch.save({
     'epoch': epoch,
@@ -235,7 +236,7 @@ def main():
     'encoder_state_dict': encoder.state_dict(),
     }, PATH)
     writer.close()
-    logging.info("Training completed")
+    print("Training completed")
 
 
 if __name__ == "__main__":
